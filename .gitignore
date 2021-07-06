@@ -1,0 +1,4 @@
+*-checkpoint.py
+*-checkpoint.dio
+*.ipynb_checkpoints/
+*.pyc
