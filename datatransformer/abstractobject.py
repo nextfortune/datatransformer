@@ -1,6 +1,6 @@
 import abc
 
-class DataTramsformer(abc.ABC):
+class DataTransformer(abc.ABC):
 
     @property
     @abc.abstractclassmethod
