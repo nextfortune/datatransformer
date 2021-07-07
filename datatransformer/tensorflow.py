@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from abstractobject import DataTransformer
+from datatransformer.abstractobject import DataTransformer
 
 class TensorflowDataTransformer(DataTransformer):
     def __init__(self, data: dict, data_spec: dict, *arg, **kwargs):

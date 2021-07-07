@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="datatransformer", # Replace with your own username
-    version="0.0.1",
+    version="0.0.6",
     author="Tim Su",
     author_email="omg80827@gmail.com",
-    description="A package for CTR prediction",
+    description="A package for data transformation",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://git.owdev.net/Jimmy/DataTransformer.git",
