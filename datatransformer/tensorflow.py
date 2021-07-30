@@ -46,8 +46,8 @@ class TensorflowDataTransformer(DataTransformer):
                 feature_columns[dim] = []
                 for feat in self._data_spec[dim]['sparse_feature']:
                     sparse_union = set()
-                    for i in range(len(tendata._data[dim][feat])):
-                        sparse_union = sparse_union.union(tendata._data[dim][feat][i])
+                    for i in range(len(self._data[dim][feat])):
+                        sparse_union = sparse_union.union(self._data[dim][feat][i])
                     fc = tf.feature_column.categorical_column_with_vocabulary_list(
                         feat, sparse_union
                     )
