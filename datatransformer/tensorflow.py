@@ -119,8 +119,8 @@ class TensorflowDataTransformer(DataTransformer):
                 dense_dims.append(dict(dense_dic))
 
                 dim_list = dim_list + (tuple(sparse_dims+dense_dims),)
-        if 'labels' in self._data:
-            labels = dict(self._data.get('labels', None))
+        if self._labels is not None:
+            labels = dict(self._labels)
             ds = tf.data.Dataset.from_tensor_slices(dim_list, labels)
         else:
             ds = tf.data.Dataset.from_tensor_slices(dim_list)
