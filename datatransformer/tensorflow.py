@@ -8,9 +8,9 @@ class TensorflowDataTransformer(DataTransformer):
     def __init__(self, data: dict, data_spec: dict, *arg, **kwargs):
         if 'labels' in data:
             self._labels = data.pop('labels')
-        self._data = data
+        self._data = data.copy()
         self._data_spec = data_spec
-        self._datareshape()
+        self._data_reshape()
 
     @property
     def dimensions(self):
@@ -48,13 +48,13 @@ class TensorflowDataTransformer(DataTransformer):
                     sparse_union = set()
                     for i in range(len(self._data[dim][feat])):
                         sparse_union = sparse_union.union(self._data[dim][feat][i])
-                    fc = tf.feature_column.categorical_column_with_vocabulary_list(
+                    fc = tf.feature_column.sequence_categorical_column_with_vocabulary_list(
                         feat, sparse_union
                     )
                     feature_columns[dim].append(fc)
 
                 for feat in self._data_spec[dim]['dense_feature']:
-                    fc = tf.feature_column.numeric_column(feat)
+                    fc = tf.feature_column.sequence_numeric_column(feat)
                     feature_columns[dim].append(fc)
 
         return feature_columns
@@ -71,7 +71,7 @@ class TensorflowDataTransformer(DataTransformer):
             raise ValueError('not all dense feature in same length.')
         return len_den
 
-    def _datareshape(self):
+    def _data_reshape(self):
         for dim in self.dimensions:
             if self._data_spec[dim]['type'] == 'sequential':
                 group = self._data[dim].set_index('trans_id').groupby('trans_id')
@@ -121,7 +121,7 @@ class TensorflowDataTransformer(DataTransformer):
                 dim_list = dim_list + (tuple(sparse_dims+dense_dims),)
         if self._labels is not None:
             labels = dict(self._labels)
-            ds = tf.data.Dataset.from_tensor_slices(dim_list, labels)
+            ds = tf.data.Dataset.from_tensor_slices((dim_list, labels))
         else:
             ds = tf.data.Dataset.from_tensor_slices(dim_list)
 
