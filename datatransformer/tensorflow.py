@@ -22,11 +22,11 @@ class TensorflowDataTransformer(DataTransformer):
 
     @property
     def dense_features(self):
-        return sum([spec.get('dense_feature', []) for dim, spec in self._data_spec.items()], [])
+        return {dim: spec['dense_feature'] for dim, spec in self._data_spec.items()}
 
     @property
     def sparse_features(self):
-        return sum([spec.get('sparse_feature', []) for dim, spec in self._data_spec.items()], [])
+        return {dim: spec['sparse_feature'] for dim, spec in self._data_spec.items()}
 
     @property
     def feature_columns(self):
