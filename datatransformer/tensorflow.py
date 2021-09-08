@@ -1,24 +1,68 @@
+import json
+import vaex as vx
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 
+from ast import literal_eval
+
 from datatransformer.abstractobject import DataTransformer
 
 class TensorflowDataTransformer(DataTransformer):
-    def __init__(self, data: dict, data_spec: dict, *arg, **kwargs):
-        if 'labels' in data:
-            self._labels = data.pop('labels')
-
-        self._data = data.copy()
+    def __init__(self, data_spec: dict, data={}, feature_column_config={}, *arg, **kwargs):
+        """Creates a DataTransformer object.
+        Args:
+          data_spec: A dictionary that represents the dataset about to be transformed.
+          data: if using small sample of data, feed it into the data dictionary to transform it.
+          feature_column_config: a dictionary that defines the categories of feature columns
+          
+          ```python
+          data_spec = {
+              'foo': {
+                  'type': 'non_sequential',
+                  'file_path': ["/path/to/data/foo.csv"], # if not set you can also feed data with §data§ arg
+                  'dense_feature': ['foo'],
+                  'sparse_feature': ['bar']
+              }
+              'bar': {
+                  'type': 'sequential',
+                  'file_path': ["/path/to/data/bar.csv"],
+                  'dense_feature': ['foo'],
+                  'sparse_feature': ['bar']
+              }
+              'labels': {
+                  'type': 'classification', # §classification§ or §regression§
+                  'file_path': [/path/to/data/label.csv]
+                  'label': ['label']
+              }
+          }
+          feature_column_config = {
+              'foo': {
+                  'column': ['category1', 'category2' ...]
+              }
+              'bar':{
+                  'column': ['category3', 'category4' ...]
+              }
+          }
+          TensorflowDataTransformer(data_spec=data_spec)
+          ```
+        """
         self._data_spec = data_spec
-        self._data_reshape()
+        self._data = data
+        self._feature_column_config = feature_column_config
 
+        if not data:
+            for dim, spec in data_spec.items():
+                if 'file_path' not in spec:
+                    raise ValueError("Please specify file_path in data_spec if data is not set.")
+        else:
+            self._data = data.copy()
+            self._data_reshape()
+        self._load()
+        
     @property
     def dimensions(self):
-        if self._data.keys() == self._data_spec.keys():
-            return list(self._data.keys())
-        else:
-            raise ValueError('dimensions between data and data_spec must be equal.')
+        return [dim for dim in self._data_spec.keys() if dim != 'labels']
 
     @property
     def dense_features(self):
@@ -30,35 +74,41 @@ class TensorflowDataTransformer(DataTransformer):
 
     @property
     def feature_columns(self):
-        feature_columns = {}
+        self._feature_columns = {}
         for dim in self.dimensions:
             if self._data_spec[dim]['type'] == 'non_sequential':
-                feature_columns[dim] = []
-                for feat in self._data_spec[dim]['sparse_feature']:
-                    fc = tf.feature_column.categorical_column_with_vocabulary_list(
-                        feat, list(self._data[dim][feat].unique())
-                    )
-                    feature_columns[dim].append(fc)
-
-                for feat in self._data_spec[dim]['dense_feature']:
-                    fc = tf.feature_column.numeric_column(feat)
-                    feature_columns[dim].append(fc)
+                self._feature_columns['non_sequential'] = {
+                    dim: {
+                        'dense': [
+                            tf.feature_column.numeric_column(feat) 
+                            for feat in self._data_spec[dim]['dense_feature']
+                        ],
+                        'sparse': [
+                            tf.feature_column.categorical_column_with_vocabulary_list(
+                                feat, self._feature_column_config[dim][feat]
+                            )
+                            for feat in self._data_spec[dim]['sparse_feature']
+                        ]
+                    }
+                }
+            elif self._data_spec[dim]['type'] == 'sequential':
+                self._feature_columns['sequential'] = {
+                    dim: {
+                        'dense': [
+                            tf.feature_column.sequence_numeric_column(feat)
+                            for feat in self._data_spec[dim]['dense_feature']
+                        ],
+                        'sparse': [
+                            tf.feature_column.sequence_categorical_column_with_vocabulary_list(
+                                feat, self._feature_column_config[dim][feat]
+                            )
+                            for feat in self._data_spec[dim]['sparse_feature']
+                        ]
+                    }
+                }
             else:
-                feature_columns[dim] = []
-                for feat in self._data_spec[dim]['sparse_feature']:
-                    sparse_union = set()
-                    for i in range(len(self._data[dim][feat])):
-                        sparse_union = sparse_union.union(self._data[dim][feat][i])
-                    fc = tf.feature_column.sequence_categorical_column_with_vocabulary_list(
-                        feat, sparse_union
-                    )
-                    feature_columns[dim].append(fc)
-
-                for feat in self._data_spec[dim]['dense_feature']:
-                    fc = tf.feature_column.sequence_numeric_column(feat)
-                    feature_columns[dim].append(fc)
-
-        return feature_columns
+                raise ValueError("Unsupported type {}".format(self._data_spec[dim]['type']))
+        return self._feature_columns
 
     @property
     def labels(self):
@@ -83,48 +133,72 @@ class TensorflowDataTransformer(DataTransformer):
                 df = group.agg({col: lambda x: x.tolist() for col in g.columns}, axis=1).reset_index()
                 self._data[dim] = df
 
-    def to_dataset(self, shuffle=False, batch_size=1):
-        dim_list = tuple()
-        for dim, val in self._data.items():
-            df_dim = self._data[dim]
-            sparse_dims = []
-            dense_dims = []
-            if self._data_spec[dim]['type'] == 'non_sequential':    
-                # extract 'sparse' feature in non_sequential dims
-                sparse_feature = self._data_spec[dim]['sparse_feature']
-                dim_sparse = df_dim[sparse_feature]
-                sparse_dims.append(dict(dim_sparse))
-
-                # extract 'dense' feature in non_sequential dims
-                dense_feature = self._data_spec[dim]['dense_feature']
-                dim_dense = df_dim[dense_feature]
-                dense_dims.append(dict(dim_dense))
-
-                dim_list = dim_list + (tuple(sparse_dims+dense_dims),)
-            else:
-                sparse_dic = dict()
-                dense_dic = dict()
-                #create sequece data raggertensor
-                col_list = dict()
-                for col in df_dim.columns:
-                    element = tf.ragged.constant(df_dim[[col]].values)
-                    col_list[col] = element
-
-                sparse_feature = self._data_spec[dim]['sparse_feature']
-                dense_feature = self._data_spec[dim]['dense_feature']
-                # extract 'sparse' feature in sequential dims
-                sparse_dic = {k: v for k, v in col_list.items() if k in sparse_feature}
-                # extract 'dense' feature in sequential dims
-                dense_dic = {k: v for k, v in col_list.items() if k in dense_feature}
-                sparse_dims.append(dict(sparse_dic))
-                dense_dims.append(dict(dense_dic))
-
-                dim_list = dim_list + (tuple(sparse_dims+dense_dims),)
-        if self._labels is not None:
-            labels = dict(self._labels)
-            ds = tf.data.Dataset.from_tensor_slices((dim_list, labels))
+    def _load(self):
+        if self._data:
+            self._data_parser()
         else:
-            ds = tf.data.Dataset.from_tensor_slices(dim_list)
+            self._file_parser()
+
+    def _data_parser(self):
+        if 'labels' in self._data:
+            self._labels = tf.data.Dataset.from_tensor_slices(dict(self._data.pop('labels')))
+            self._data.pop('labels')
+        else:
+            self._labels = None
+
+        for dim, val in self._data.items():
+            if self._data_spec[dim]['type'] == 'non_sequential':
+                self._data_spec[dim]['data'] = tf.data.Dataset.from_tensor_slices(
+                    dict(val[self.sparse_features[dim]+self.dense_features[dim]])
+                )
+            else:
+                self._data_spec[dim]['data'] = tf.data.Dataset.from_tensor_slices({
+                    feature: tf.ragged.constant(val[[feature]].values)
+                    for eature in self.sparse_features[dim] + self.dense_features[dim]
+                })
+
+    def _file_parser(self):
+        if 'labels' in self._data_spec:
+            self._labels = tf.data.Dataset.from_tensor_slices(
+                dict(vx.open(self._data_spec['labels']['file_path']).to_pandas_df())
+            )
+            self._data_spec.pop('labels')
+        else:
+            self._labels = None
+        
+        for dim, spec in self._data_spec.items():
+            if spec['type'] == 'sequential':
+                converter_dict =dict.fromkeys(
+                    spec['dense_feature']+spec['sparse_feature'], lambda x: literal_eval(x)
+                )
+                vx_frame = vx.open(
+                    path=spec['file_path'], converters=converter_dict
+                )
+                self._data_spec[dim]['data'] = tf.data.Dataset.from_tensor_slices({
+                    x: (lambda x : tf.ragged.constant(vx_frame[x].to_numpy()))(x)
+                    for x in spec['dense_feature']+spec['sparse_feature']
+                })
+            elif spec['type'] == 'non_sequential':
+                self._data_spec[dim]['data'] = tf.data.experimental.make_csv_dataset(
+                    file_pattern=spec['file_path'],
+                    select_columns=spec['dense_feature']+spec['sparse_feature'],
+                    header=True, batch_size=1
+                )
+            else:
+                raise ValueError("the dimension type should be either sequential or non_sequential.")
+
+    def list_files(self):
+        return {dim: spec['file_path'] for dim, spec in self._data_spec.items()}
+
+    def to_dataset(self, shuffle=False, batch_size=1):
+        features = tf.data.Dataset.zip(
+            tuple(spec['data'] for dim, spec in self._data_spec.items())
+        )
+        
+        if self._labels is not None:
+            ds = tf.data.Dataset.zip((features, self._labels))
+        else:
+            ds = features
 
         if shuffle:
             ds = ds.shuffle(buffer_size=self.buffer_size)
