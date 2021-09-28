@@ -154,7 +154,7 @@ class TensorflowDataTransformer(DataTransformer):
             else:
                 self._data_spec[dim]['data'] = tf.data.Dataset.from_tensor_slices({
                     feature: tf.ragged.constant(val[[feature]].values)
-                    for eature in self.sparse_features[dim] + self.dense_features[dim]
+                    for feature in self.sparse_features[dim] + self.dense_features[dim]
                 })
 
     def _file_parser(self):
