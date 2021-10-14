@@ -142,7 +142,7 @@ class TensorflowDataTransformer(DataTransformer):
     def _data_parser(self):
         if 'labels' in self._data:
             self._labels = tf.data.Dataset.from_tensor_slices(dict(self._data.pop('labels')))
-            self._data.pop('labels')
+            self._data_spec.pop('labels')
         else:
             self._labels = None
 
