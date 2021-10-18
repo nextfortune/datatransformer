@@ -1,7 +1,7 @@
 """Generate Fake Data for Unit testing"""
 import pandas as pd
 from faker import Faker
-from datatransformer.tensorflow import tensorflow_table as dtf
+from datatransformer.tensorflow import tensorflow_text as dtf
 
 def generate_fake_data():
     """Generate Fake Data for Unit testing"""
