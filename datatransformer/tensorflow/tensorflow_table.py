@@ -1,26 +1,30 @@
-import json
-import vaex as vx
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-
+"""Tensorflow Data Transformer for Tables"""
 from ast import literal_eval
-
 from datatransformer.abstractobject import DataTransformer
 
+import vaex as vx
+import tensorflow as tf
+#pylint: disable=unnecessary-lambda
 class TensorflowDataTransformer(DataTransformer):
-    def __init__(self, data_spec: dict, data={}, feature_column_config={}, *arg, **kwargs):
+    """Tensorflow Data Transformer for Tables"""
+    #pylint: disable=R0913
+    def __init__(
+        self, data_spec: dict, data: dict,
+        feature_column_config: dict,
+        shuffle: bool =False, batch_size: int =1
+    ):
         """Creates a DataTransformer object.
         Args:
           data_spec: A dictionary that represents the dataset about to be transformed.
           data: if using small sample of data, feed it into the data dictionary to transform it.
           feature_column_config: a dictionary that defines the categories of feature columns
-          
+
           ```python
           data_spec = {
               'foo': {
                   'type': 'non_sequential',
-                  'file_path': ["/path/to/data/foo.csv"], # if not set you can also feed data with §data§ arg
+                  'file_path': ["/path/to/data/foo.csv"],
+                        # if not set you can also feed data with §data§ arg
                   'dense_feature': ['foo'],
                   'sparse_feature': ['bar']
               }
@@ -50,16 +54,22 @@ class TensorflowDataTransformer(DataTransformer):
         self._data_spec = data_spec
         self._data = data
         self._feature_column_config = feature_column_config
+        self._feature_columns = {}
+        self._labels= None
+        self.shuffle = shuffle
+        self.batch_size = batch_size
 
         if not data:
+            #pylint: disable=W0612
             for dim, spec in data_spec.items():
                 if 'file_path' not in spec:
                     raise ValueError("Please specify file_path in data_spec if data is not set.")
+            #pylint: enable=W0612
         else:
             self._data = data.copy()
             self._data_reshape()
         self._load()
-        
+
     @property
     def dimensions(self):
         return [dim for dim in self._data_spec.keys() if dim != 'labels']
@@ -74,13 +84,12 @@ class TensorflowDataTransformer(DataTransformer):
 
     @property
     def feature_columns(self):
-        self._feature_columns = {}
         for dim in self.dimensions:
             if self._data_spec[dim]['type'] == 'non_sequential':
                 self._feature_columns['non_sequential'] = {
                     dim: {
                         'dense': [
-                            tf.feature_column.numeric_column(feat) 
+                            tf.feature_column.numeric_column(feat)
                             for feat in self._data_spec[dim]['dense_feature']
                         ],
                         'sparse': [
@@ -107,7 +116,7 @@ class TensorflowDataTransformer(DataTransformer):
                     }
                 }
             else:
-                raise ValueError("Unsupported type {}".format(self._data_spec[dim]['type']))
+                raise ValueError(f"Unsupported type {self._data_spec[dim]['type']}")
         return self._feature_columns
 
     @property
@@ -116,6 +125,7 @@ class TensorflowDataTransformer(DataTransformer):
 
     @property
     def buffer_size(self):
+        """Get buffer size"""
         den = iter(self.dense_features)
         len_den = len(next(den))
         if not all(len(l) == len_den for l in den):
@@ -123,25 +133,37 @@ class TensorflowDataTransformer(DataTransformer):
         return len_den
 
     def _data_reshape(self):
+        """Reshape Sequential Data"""
         for dim in self.dimensions:
             if self._data_spec[dim]['type'] == 'sequential':
                 group = self._data[dim].set_index('trans_id').groupby('trans_id')
                 #這裡的group 可能要根據data客製化
-                for i, g in group:
-                    if len(g) > 1:
+                #pylint: disable=W0612
+                for index, group_ele in group:
+                    if len(group_ele) > 1:
+                        reshape_dataframe = group.agg(
+                            {
+                                col: lambda x: x.tolist() for col in group_ele.columns
+                            },
+                            axis=1
+                        ).reset_index()
                         break
-                df = group.agg({col: lambda x: x.tolist() for col in g.columns}, axis=1).reset_index()
-                self._data[dim] = df
+                self._data[dim] = reshape_dataframe
+                #pylint: enable=W0612
 
     def _load(self):
+        """Load Data"""
         if self._data:
             self._data_parser()
         else:
             self._file_parser()
 
     def _data_parser(self):
+        """Parse Data from data input format"""
         if 'labels' in self._data:
-            self._labels = tf.data.Dataset.from_tensor_slices(dict(self._data.pop('labels')))
+            self._labels = tf.data.Dataset.from_tensor_slices(
+                dict(self._data.pop('labels'))
+            )
             self._data_spec.pop('labels')
         else:
             self._labels = None
@@ -158,6 +180,7 @@ class TensorflowDataTransformer(DataTransformer):
                 })
 
     def _file_parser(self):
+        """Parse Data from file input format"""
         if 'labels' in self._data_spec:
             self._labels = tf.data.Dataset.from_tensor_slices(
                 dict(vx.open(self._data_spec['labels']['file_path']).to_pandas_df())
@@ -165,7 +188,7 @@ class TensorflowDataTransformer(DataTransformer):
             self._data_spec.pop('labels')
         else:
             self._labels = None
-        
+
         for dim, spec in self._data_spec.items():
             if spec['type'] == 'sequential':
                 converter_dict =dict.fromkeys(
@@ -185,23 +208,27 @@ class TensorflowDataTransformer(DataTransformer):
                     header=True, batch_size=1
                 )
             else:
-                raise ValueError("the dimension type should be either sequential or non_sequential.")
+                raise ValueError(
+                    "the dimension type should be either sequential or non_sequential."
+                )
 
     def list_files(self):
+        """List of used file"""
         return {dim: spec['file_path'] for dim, spec in self._data_spec.items()}
 
-    def to_dataset(self, shuffle=False, batch_size=1):
+    def to_dataset(self):
+        """Transform data to tensroflow dataset"""
         features = tf.data.Dataset.zip(
             tuple(spec['data'] for dim, spec in self._data_spec.items())
         )
-        
-        if self._labels is not None:
-            ds = tf.data.Dataset.zip((features, self._labels))
-        else:
-            ds = features
 
-        if shuffle:
-            ds = ds.shuffle(buffer_size=self.buffer_size)
-        if batch_size:
-            ds = ds.batch(batch_size)
-        return ds
+        if self._labels is not None:
+            dataset = tf.data.Dataset.zip((features, self._labels))
+        else:
+            dataset = features
+
+        if self.shuffle is True:
+            dataset = dataset.shuffle(buffer_size=self.buffer_size)
+        if self.batch_size:
+            dataset = dataset.batch(self.batch_size)
+        return dataset

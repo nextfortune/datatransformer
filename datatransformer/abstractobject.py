@@ -1,32 +1,28 @@
+#pylint: disable=C0114,C0115,C0116
 import abc
 
 class DataTransformer(abc.ABC):
 
     @property
-    @abc.abstractclassmethod
-    def dimensions(cls):
+    def dimensions(self):
         pass
-    
+
     @property
-    @abc.abstractclassmethod
-    def dense_features(cls):
+    def dense_features(self):
         pass
-    
+
     @property
-    @abc.abstractclassmethod
-    def sparse_features(cls):
+    def sparse_features(self):
         pass
-    
+
     @property
-    @abc.abstractclassmethod
-    def feature_columns(cls):
+    def feature_columns(self):
         pass
-    
+
     @property
-    @abc.abstractclassmethod
-    def labels(cls):
+    def labels(self):
         pass
-    
-    @abc.abstractclassmethod
+
+    @classmethod
     def to_dataset(cls):
         pass
