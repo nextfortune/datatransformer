@@ -11,9 +11,9 @@ setuptools.setup(
     description="A package for data transformation",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://git.owdev.net/Jimmy/DataTransformer.git",
+    url="https://github.com/nextfortune/datatransformer.git",
     project_urls={
-        "Bug Tracker": "https://git.owdev.net/Jimmy/DataTransformer/-/issues",
+        "Bug Tracker": "https://github.com/nextfortune/datatransformer/issues",
     },
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -23,7 +23,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     python_requires=">=3.8",
     install_requires=[
-        "tensorflow>=2.4.1",
+        "tensorflow>=2.6.0",
         "vaex>=4.4.0"
     ]
 )
