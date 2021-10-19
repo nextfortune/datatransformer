@@ -9,9 +9,12 @@ class TensorflowDataTransformer(DataTransformer):
     """Tensorflow Data Transformer for Tables"""
     #pylint: disable=R0913
     def __init__(
-        self, data_spec: dict, data: dict,
+        self,
+        data_spec: dict,
         feature_column_config: dict,
-        shuffle: bool =False, batch_size: int =1
+        data: dict =None,
+        shuffle: bool =False,
+        batch_size: int =1
     ):
         """Creates a DataTransformer object.
         Args:
