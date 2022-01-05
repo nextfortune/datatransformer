@@ -75,6 +75,12 @@ def generate_fake_data():
             'dense_feature': [
                 'f_feature_3',
             ],
+            'file_path': ['foo_data.csv'],
+            'exclude_columns': [],
+            'orient': 'records',
+            'dtype': {
+                'f_feature_0': int, 'f_feature_5': str,
+            },
         },
         'bar': {
             'type': 'sequential',
@@ -84,6 +90,12 @@ def generate_fake_data():
             'dense_feature': [
                 'b_feature_5',
             ],
+            'file_path': ['bar_data.csv'],
+            'exclude_columns': [],
+            'orient': 'records',
+            'dtype': {
+                'b_feature_2': bool, 'b_feature_4': str,
+            },
         },
         'labels': {
             'type': 'non_sequential',

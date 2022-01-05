@@ -1,18 +1,21 @@
 """Tensorflow Data Transformer for Tables"""
+import json
 from ast import literal_eval
 from datatransformer.abstractobject import DataTransformer
 
 import vaex as vx
+import pandas as pd
 import tensorflow as tf
 #pylint: disable=unnecessary-lambda
 class TensorflowDataTransformer(DataTransformer):
     """Tensorflow Data Transformer for Tables"""
     #pylint: disable=R0913
+    #pylint: disable=R0902
     def __init__(
         self,
         data_spec: dict,
         feature_column_config: dict,
-        data: dict =None,
+        data=None,
         shuffle: bool =False,
         batch_size: int =1
     ):
@@ -29,13 +32,19 @@ class TensorflowDataTransformer(DataTransformer):
                   'file_path': ["/path/to/data/foo.csv"],
                         # if not set you can also feed data with §data§ arg
                   'dense_feature': ['foo'],
-                  'sparse_feature': ['bar']
+                  'sparse_feature': ['bar'],
+                  'exclude_columns': ['a','b'],
+                  'orient': 'records',
+                  'dtype': {'column': type},
               }
               'bar': {
                   'type': 'sequential',
                   'file_path': ["/path/to/data/bar.csv"],
                   'dense_feature': ['foo'],
-                  'sparse_feature': ['bar']
+                  'sparse_feature': ['bar'],
+                  'exclude_columns': ['b','c'],
+                  'orient': 'records',
+                  'dtype': {'column': type},
               }
               'labels': {
                   'type': 'classification', # §classification§ or §regression§
@@ -55,10 +64,10 @@ class TensorflowDataTransformer(DataTransformer):
           ```
         """
         self._data_spec = data_spec
-        self._data = data
         self._feature_column_config = feature_column_config
         self._feature_columns = {}
         self._labels= None
+        self._preserve_columns={}
         self.shuffle = shuffle
         self.batch_size = batch_size
 
@@ -69,7 +78,12 @@ class TensorflowDataTransformer(DataTransformer):
                     raise ValueError("Please specify file_path in data_spec if data is not set.")
             #pylint: enable=W0612
         else:
-            self._data = data.copy()
+            #parse different type of Input Data
+            self._data = self._input_parser(data)
+            #parse dims exclude columns
+            for dim in self.dimensions:
+                self._dim_parser(dim)
+
             self._data_reshape()
         self._load()
 
@@ -134,6 +148,32 @@ class TensorflowDataTransformer(DataTransformer):
         if not all(len(l) == len_den for l in den):
             raise ValueError('not all dense feature in same length.')
         return len_den
+
+    def _input_parser(self, data):
+        """Parse Different Inputs to Dataframe"""
+        #Data Input Json String to DataFrame
+        if isinstance(data, str):
+            #check json serializable
+            try:
+                json.dumps(data)
+            except Exception as error:
+                raise error
+            data = json.loads(data)
+            data = {
+                dim: pd.read_json(
+                    instances, orient=self._data_spec[dim]['orient'],
+                    dtype=self._data_spec[dim]['dtype']
+                ) for dim, instances in data.items()
+            }
+
+        return data
+
+    def _dim_parser(self, dim):
+        """Dimensions Parsing"""
+        #save exclude columns
+        self._preserve_columns[dim] = self._data[dim][self._data_spec[dim]['exclude_columns']]
+        #drop exclude columns
+        self._data[dim] = self._data[dim].drop(self._data_spec[dim]['exclude_columns'], axis=1)
 
     def _data_reshape(self):
         """Reshape Sequential Data"""
