@@ -183,14 +183,13 @@ class TensorflowDataTransformer(DataTransformer):
                 #這裡的group 可能要根據data客製化
                 #pylint: disable=W0612
                 for index, group_ele in group:
-                    if len(group_ele) > 1:
-                        reshape_dataframe = group.agg(
-                            {
-                                col: lambda x: x.tolist() for col in group_ele.columns
-                            },
-                            axis=1
-                        ).reset_index()
-                        break
+                    reshape_dataframe = group.agg(
+                        {
+                            col: lambda x: x.tolist() for col in group_ele.columns
+                        },
+                        axis=1
+                    ).reset_index()
+                    break
                 self._data[dim] = reshape_dataframe
                 #pylint: enable=W0612
 
