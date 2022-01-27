@@ -64,6 +64,7 @@ class TensorflowDataTransformer(DataTransformer):
           ```
         """
         self._data_spec = data_spec
+        self._data = data
         self._feature_column_config = feature_column_config
         self._feature_columns = {}
         self._labels= None
