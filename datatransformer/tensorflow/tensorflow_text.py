@@ -8,6 +8,7 @@ import tensorflow as tf
 
 from datatransformer.abstractobject import DataTransformer
 #pylint: disable=unnecessary-lambda
+#pylint: disable=W0221
 class TensorflowDataTransformer(DataTransformer):
     """Tensorflow Data Transformer for Tables"""
     #pylint: disable=R0913
