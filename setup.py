@@ -30,3 +30,4 @@ setuptools.setup(
         "tensorflow-gpu": ['tnesorflow-gpu >= 2.7.0']
     }
 )
+
