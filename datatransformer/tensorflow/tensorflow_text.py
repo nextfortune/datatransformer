@@ -1,11 +1,12 @@
 """Tensorflow Data Transformer for Tables"""
 import json
 from ast import literal_eval
-from datatransformer.abstractobject import DataTransformer
 
 import vaex as vx
 import pandas as pd
 import tensorflow as tf
+
+from datatransformer.abstractobject import DataTransformer
 #pylint: disable=unnecessary-lambda
 class TensorflowDataTransformer(DataTransformer):
     """Tensorflow Data Transformer for Tables"""
