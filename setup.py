@@ -22,7 +22,7 @@ setuptools.setup(
     ],
     packages=setuptools.find_packages(),
     python_requires=">=3.8",
-    install_requires=[,
+    install_requires=[
         "vaex>=4.4.0"
     ],
     extras_require={
