@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="datatransformer", # Replace with your own username
-    version="0.1.8",
+    version="0.1.9",
     author="Tim Su",
     author_email="omg80827@gmail.com",
     description="A package for data transformation",
@@ -21,7 +21,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     packages=setuptools.find_packages(),
-    python_requires=">=3.8",
+    python_requires=">=3.7",
     install_requires=[
         "vaex>=4.4.0"
     ],
